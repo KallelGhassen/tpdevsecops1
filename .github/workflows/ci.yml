@@ -1,0 +1,31 @@
+name: CI/CD - democyber
+
+# Déclenche le workflow sur push ou pull request vers main
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber:latest
+
+    steps:
+      # Récupérer le code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Installer Java 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # Compiler et empaqueter (package inclut déjà la compilation)
+      - name: Build Java project with Maven
+        run: mvn clean package
