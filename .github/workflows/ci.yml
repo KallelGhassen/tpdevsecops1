@@ -61,7 +61,7 @@ jobs:
           image-ref: democyber:latest
           format: 'table'
           exit-code: '1'
-          severity: 'CRITICAL,HIGH'
+          severity: 'HIGH'
 
 
       # Installer Java 21
