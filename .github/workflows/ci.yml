@@ -14,57 +14,19 @@ jobs:
       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber:latest
 
     steps:
-      # Récupérer le code (historique complet pour Gitleaks)
+      # 1. Récupérer le code (historique complet pour Gitleaks)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Scan Gitleaks (avant la compilation)
+      # 2. Scan Gitleaks (un seul step, avant la compilation)
       - name: Run Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-     # Sauvegarder le rapport Gitleaks
-      - name: Upload Gitleaks report
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitleaks-report
-          path: results.sarif
-      # Login Docker Hub
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build Docker image
-      - name: Build Docker image
-        run: docker build -t $DOCKER_IMAGE_NAME .
-
-      # Test Docker image
-      - name: Test Docker image locally
-        run: |
-          docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME
-          sleep 10
-          curl -f http://localhost:8080 || echo "App not responding"
-          docker stop democyber-test
-          docker rm democyber-test
-
-      # Trivy scan
-      - name: Build Docker image
-        run: docker build -t democyber:latest .
-
-      - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@v0.20.0
-        with:
-          image-ref: democyber:latest
-          format: 'table'
-          exit-code: '0'
-          severity: 'HIGH,CRITICAL'
-
-
-      # Installer Java 21
+      # 3. Installer Java 21
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -72,9 +34,40 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Compiler et empaqueter (package inclut déjà la compilation)
+      # 4. Compiler et empaqueter
       - name: Build Java project with Maven
         run: mvn clean package
-      # Gitleaks scan (before compilation)
-      - name: Run Gitleaks scan
-        uses: zricethezav/gitleaks-action@v2
+
+      # 5. Login Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 6. Build de l'image Docker (une seule fois)
+      - name: Build Docker image
+        run: docker build -t $DOCKER_IMAGE_NAME .
+
+      # 7. Test de l'image
+      - name: Test Docker image locally
+        run: |
+          docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME
+          sleep 10
+          curl -f http://localhost:8080
+          docker stop democyber-test
+          docker rm democyber-test
+
+      # 8. Scan Trivy sur la même image
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE_NAME }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'HIGH,CRITICAL'
+
+      # 9. Publier l'image (seulement sur push vers main)
+      - name: Push Docker image
+        if: github.event_name == 'push'
+        run: docker push $DOCKER_IMAGE_NAME
