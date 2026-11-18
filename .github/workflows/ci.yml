@@ -75,6 +75,10 @@ jobs:
       # Compiler et empaqueter (package inclut déjà la compilation)
       - name: Build Java project with Maven
         run: mvn clean package
-      # Gitleaks scan (before compilation)
       - name: Run Gitleaks scan
-        uses: zricethezav/gitleaks-action@v2
+        run: |
+          VERSION=8.24.3
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+          ./gitleaks detect --source . --redact --verbose --exit-code 2
